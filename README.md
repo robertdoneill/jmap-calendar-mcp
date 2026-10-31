@@ -6,6 +6,8 @@ create or change events on any [JMAP](https://jmap.io) server that supports JMAP
 
 One Python file, standard library only.
 
+<!-- mcp-name: io.github.robertdoneill/jmap-calendar-mcp -->
+
 ## Tools
 
 | Tool | What it does |
@@ -24,7 +26,19 @@ Built to be safe to hand to an agent:
 
 ## Setup
 
-1. Create an API key (app password) for the account. On Stalwart, limit its permissions to the calendar ones.
+1. Create an API key for the account. On Stalwart, open the account in the admin (Directory → Accounts), set
+   the key's permissions to **Replace all permissions**, and give it only these:
+   - Sign in to the server
+   - JMAP: Retrieve calendar details and properties
+   - JMAP: Track changes to calendars since a given state
+   - JMAP: Retrieve calendar event details
+   - JMAP: Track changes to calendar events since a given state
+   - JMAP: Search for calendar events matching criteria
+   - JMAP: Track changes to calendar event query results
+   - JMAP: Create new calendar events
+   - JMAP: Modify existing calendar events
+
+   The key then cannot read or send mail, or delete anything.
 2. Add the server to your MCP client. For Claude Code:
 
 ```bash
