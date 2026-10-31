@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jmap-calendar-mcp"
-version = "0.1.0"
-description = "MCP server that lets AI agents read and create calendar events on any JMAP server (Stalwart and others)"
+version = "0.2.0"
+description = "MCP server that lets AI agents read, create and update calendar events on any JMAP server (Stalwart and others)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

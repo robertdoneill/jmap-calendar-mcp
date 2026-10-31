@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""MCP server (stdio) for JMAP Calendars: list calendars, find events, create and update events.
+"""MCP server (stdio) for JMAP Calendars: list calendars, find events, create, update and (if allowed) delete events.
 
 Talks to any JMAP server with urn:ietf:params:jmap:calendars (Stalwart 1.0+). Standard library only.
 
   JMAP_SESSION_URL   e.g. https://mail.example.com/.well-known/jmap
   JMAP_BEARER_TOKEN  an API key; give it calendar permissions only
   JMAP_ALLOW_INVITES set to 1 to let create/update send invitations when asked (off by default)
-
-There is deliberately no delete tool: an agent can move or rename an event but not remove it.
+  JMAP_ALLOW_DELETE  set to 1 to offer delete_calendar_event (off by default: an agent can then move or rename
+                     an event but not remove it)
 """
 import json
 import os
@@ -70,6 +70,7 @@ class Calendar:
     def __init__(self, jm):
         self.jm = jm
         self.allow_invites = os.environ.get("JMAP_ALLOW_INVITES") == "1"
+        self.allow_delete = os.environ.get("JMAP_ALLOW_DELETE") == "1"
 
     def calendars(self):
         cals = self.jm.call("Calendar/get", {"properties": ["id", "name", "isDefault", "myRights"]})["list"]
@@ -162,6 +163,21 @@ class Calendar:
             raise RuntimeError(f"not updated: {(out.get('notUpdated') or {}).get(eid)}")
         return self.jm.call("CalendarEvent/get", {"ids": [eid], "properties": EVENT_PROPS})["list"][0]
 
+    def delete(self, a):
+        """Removes the whole event, every occurrence of a recurring one. No cancellations are sent."""
+        if not self.allow_delete:
+            raise PermissionError("deleting events is turned off for this connector (JMAP_ALLOW_DELETE)")
+        eid = a.get("event_id")
+        if not eid:
+            raise ValueError("event_id is required (find it with find_calendar_events)")
+        found = self.jm.call("CalendarEvent/get", {"ids": [eid], "properties": ["id", "title", "start", "timeZone"]})
+        if not found["list"]:
+            raise RuntimeError(f"no event {eid}")
+        out = self.jm.call("CalendarEvent/set", {"destroy": [eid], "sendSchedulingMessages": False})
+        if eid not in (out.get("destroyed") or []):
+            raise RuntimeError(f"not deleted: {(out.get('notDestroyed') or {}).get(eid)}")
+        return {"deleted": found["list"][0]}
+
 
 EVENT_INPUT = {
     "title": {"type": "string"},
@@ -199,6 +215,16 @@ TOOLS = [
                      "required": ["event_id"]}},
 ]
 
+DELETE_TOOL = {
+    "name": "delete_calendar_event",
+    "description": "Delete an event, every occurrence if it repeats. Only when the user asked to remove this event: "
+                   "find it first and confirm which one. Attendees are not notified.",
+    "inputSchema": {"type": "object", "properties": {"event_id": {"type": "string"}}, "required": ["event_id"]}}
+
+
+def tools():
+    return TOOLS + ([DELETE_TOOL] if os.environ.get("JMAP_ALLOW_DELETE") == "1" else [])
+
 
 def reply(id_, result=None, error=None):
     msg = {"jsonrpc": "2.0", "id": id_}
@@ -219,9 +245,9 @@ def main():
         if method == "initialize":
             reply(id_, {"protocolVersion": req["params"].get("protocolVersion", "2025-06-18"),
                         "capabilities": {"tools": {}},
-                        "serverInfo": {"name": "jmap-calendar", "version": "0.1.0"}})
+                        "serverInfo": {"name": "jmap-calendar", "version": "0.2.0"}})
         elif method == "tools/list":
-            reply(id_, {"tools": TOOLS})
+            reply(id_, {"tools": tools()})
         elif method == "tools/call":
             p = req["params"]
             a = p.get("arguments") or {}
@@ -231,7 +257,8 @@ def main():
                        "find_calendar_events": lambda: cal.find(a.get("after"), a.get("before"), a.get("text"),
                                                                 a.get("calendar"), a.get("limit") or 50),
                        "create_calendar_event": lambda: cal.create(a),
-                       "update_calendar_event": lambda: cal.update(a)}[p["name"]]()
+                       "update_calendar_event": lambda: cal.update(a),
+                       "delete_calendar_event": lambda: cal.delete(a)}[p["name"]]()
                 reply(id_, {"content": [{"type": "text", "text": json.dumps(out, indent=1)}]})
             except Exception as e:
                 reply(id_, {"content": [{"type": "text", "text": f"error: {e}"}], "isError": True})

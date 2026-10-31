@@ -16,6 +16,9 @@ class FakeJmap:
                              {"id": "c2", "name": "Home", "myRights": {"mayWriteAll": True}}]}
         if method == "CalendarEvent/set":
             self.sets.append(args)
+            if "destroy" in args:
+                gone = [i for i in args["destroy"] if self.events.pop(i, None)]
+                return {"destroyed": gone}
             if "create" in args:
                 self.events["e1"] = {"id": "e1", **args["create"]["new"]}
                 return {"created": {"new": {"id": "e1"}}}
@@ -25,7 +28,7 @@ class FakeJmap:
             self.events[eid].update(args["update"][eid])
             return {"updated": {eid: None}}
         if method == "CalendarEvent/get":
-            return {"list": [self.events[i] for i in args["ids"]]}
+            return {"list": [self.events[i] for i in args["ids"] if i in self.events]}
         if method == "CalendarEvent/query":
             self.query = args
             return {"ids": []}
@@ -35,6 +38,7 @@ class FakeJmap:
 @pytest.fixture
 def cal(monkeypatch):
     monkeypatch.delenv("JMAP_ALLOW_INVITES", raising=False)
+    monkeypatch.delenv("JMAP_ALLOW_DELETE", raising=False)
     return m.Calendar(FakeJmap())
 
 
@@ -92,5 +96,20 @@ def test_find_defaults_to_next_30_days(cal):
     assert f["text"] == "dentist" and f["after"].endswith("Z") and f["before"] > f["after"]
 
 
-def test_no_delete_tool():
-    assert all("delete" not in t["name"] for t in m.TOOLS)
+def test_delete_off_by_default(cal):
+    assert all("delete" not in t["name"] for t in m.tools())
+    cal.create({"title": "x", "start": "2026-11-03T10:00", "time_zone": "UTC"})
+    with pytest.raises(PermissionError):
+        cal.delete({"event_id": "e1"})
+    assert "e1" in cal.jm.events
+
+
+def test_delete_when_allowed(cal, monkeypatch):
+    monkeypatch.setenv("JMAP_ALLOW_DELETE", "1")
+    assert any(t["name"] == "delete_calendar_event" for t in m.tools())
+    cal = m.Calendar(cal.jm)
+    cal.create({"title": "Dentist", "start": "2026-11-03T10:00", "time_zone": "UTC"})
+    assert cal.delete({"event_id": "e1"})["deleted"]["title"] == "Dentist"
+    assert cal.jm.sets[-1] == {"destroy": ["e1"], "sendSchedulingMessages": False}
+    with pytest.raises(RuntimeError, match="no event"):
+        cal.delete({"event_id": "e1"})

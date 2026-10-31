@@ -1,22 +1,23 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.robertdoneill/jmap-calendar-mcp",
-  "description": "Read calendars and create or change events on any JMAP server, such as Stalwart. No delete.",
+  "description": "Read calendars and create, change or (opt-in) delete events on any JMAP server, such as Stalwart.",
   "repository": {
     "url": "https://github.com/robertdoneill/jmap-calendar-mcp",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "jmap-calendar-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         { "name": "JMAP_SESSION_URL", "description": "JMAP session URL, usually https://<host>/.well-known/jmap", "isRequired": true },
         { "name": "JMAP_BEARER_TOKEN", "description": "API key for the account, limited to calendar permissions", "isRequired": true, "isSecret": true },
-        { "name": "JMAP_ALLOW_INVITES", "description": "1 to allow sending invitations when a call asks for it", "isRequired": false }
+        { "name": "JMAP_ALLOW_INVITES", "description": "1 to allow sending invitations when a call asks for it", "isRequired": false },
+        { "name": "JMAP_ALLOW_DELETE", "description": "1 to offer delete_calendar_event", "isRequired": false }
       ]
     }
   ]
