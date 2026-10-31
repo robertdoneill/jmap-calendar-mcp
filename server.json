@@ -1,5 +1,5 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.robertdoneill/jmap-calendar-mcp",
   "description": "Read calendars and create or change events on any JMAP server, such as Stalwart. No delete.",
   "repository": {
